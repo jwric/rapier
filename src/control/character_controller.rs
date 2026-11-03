@@ -538,7 +538,8 @@ impl KinematicCharacterController {
                     .filter(|rb| rb.is_kinematic());
 
                 for m in &manifolds {
-                    if self.is_grounded_at_contact_manifold(m, character_pos, dims) {
+                    let stands_on = self.is_grounded_at_contact_manifold(m, character_pos, dims);
+                    if stands_on {
                         grounded = true;
                     }
 
@@ -557,12 +558,14 @@ impl KinematicCharacterController {
                                 let normal_current_mvt = translation_remaining.dot(normal);
 
                                 manifold_center += contact_point;
-                                *translation_remaining +=
-                                    normal * (normal_target_mvt - normal_current_mvt);
+                                if stands_on || normal_target_mvt > normal_current_mvt {
+                                    *translation_remaining +=
+                                        normal * (normal_target_mvt - normal_current_mvt);
+                                }
                             }
                         }
 
-                        if num_active_contacts > 0 {
+                        if stands_on && num_active_contacts > 0 {
                             let target_vel = kinematic_parent
                                 .velocity_at_point(manifold_center / num_active_contacts as Real);
                             let tangent_platform_mvt =
@@ -666,7 +669,7 @@ impl KinematicCharacterController {
 
     fn compute_hit_info(&self, toi: ShapeCastHit) -> HitInfo {
         #[cfg(feature = "dim2")]
-        let angle_with_floor = self.up.angle_to(toi.normal1);
+        let angle_with_floor = self.up.angle_to(toi.normal1).abs();
         #[cfg(feature = "dim3")]
         let angle_with_floor = self.up.angle_between(toi.normal1);
         let is_ceiling = self.up.dot(toi.normal1) < 0.0;
@@ -828,7 +831,7 @@ impl KinematicCharacterController {
             let slope_translation = horizontal_slope_translation + vertical_slope_translation;
 
             #[cfg(feature = "dim2")]
-            let angle_with_floor = self.up.angle_to(hit.normal1);
+            let angle_with_floor = self.up.angle_to(hit.normal1).abs();
             #[cfg(feature = "dim3")]
             let angle_with_floor = self.up.angle_between(hit.normal1);
             let climbing = self.up.dot(slope_translation) >= 0.0;
